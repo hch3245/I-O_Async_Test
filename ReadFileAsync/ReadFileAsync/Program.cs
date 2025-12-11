@@ -99,8 +99,8 @@ namespace FileReadDemo
                 {
                     sw.Stop();
 
-                    // 스레드 모니터 종료 & 최댓값 정보 가져오기
-                    var maxStats = await ThreadPoolMonitor.StopAsync();
+                    // 스레드 모니터 종료 & 통계 정보 가져오기
+                    var stats = await ThreadPoolMonitor.StopAsync();
 
                     // 애니메이션 중지
                     cts.Cancel();
@@ -118,12 +118,16 @@ namespace FileReadDemo
                     // 하단에 요약 정보 출력
                     Ui.WriteBottom($"소요 시간: {sw.Elapsed} (미리열기: {preloadStreams})");
 
-                    // 그 위 줄에 스레드 사용 최대값 표시
+                    // 그 위 줄에 스레드 사용 최대/평균 표시
                     int infoLine = Math.Max(0, Console.WindowHeight - 4);
                     Console.SetCursorPosition(2, infoLine);
+
                     string statsText =
-                        $"최대 ThreadPool Busy - Worker: {maxStats.MaxWorkerBusy}, IOCP: {maxStats.MaxIoBusy}, " +
-                        $"최대 OS 스레드 수: {maxStats.MaxOsThreads}";
+                        $"ThreadPool Busy Max/Avg - " +
+                        $"Worker: {stats.MaxWorkerBusy}/{stats.AvgWorkerBusy:F1}, " +
+                        $"IOCP: {stats.MaxIoBusy}/{stats.AvgIoBusy:F1}  " +
+                        $"OS Threads Max/Avg: {stats.MaxOsThreads}/{stats.AvgOsThreads:F1}";
+
                     Console.Write(statsText.PadRight(Math.Max(0, Console.WindowWidth - 2)));
 
                     // 미리 연 파일 스트림 정리
@@ -301,11 +305,25 @@ namespace FileReadDemo
         public int MaxIoBusy { get; }
         public int MaxOsThreads { get; }
 
-        public ThreadPoolStats(int maxWorkerBusy, int maxIoBusy, int maxOsThreads)
+        public double AvgWorkerBusy { get; }
+        public double AvgIoBusy { get; }
+        public double AvgOsThreads { get; }
+
+        public ThreadPoolStats(
+            int maxWorkerBusy,
+            int maxIoBusy,
+            int maxOsThreads,
+            double avgWorkerBusy,
+            double avgIoBusy,
+            double avgOsThreads)
         {
             MaxWorkerBusy = maxWorkerBusy;
             MaxIoBusy = maxIoBusy;
             MaxOsThreads = maxOsThreads;
+
+            AvgWorkerBusy = avgWorkerBusy;
+            AvgIoBusy = avgIoBusy;
+            AvgOsThreads = avgOsThreads;
         }
     }
 
@@ -317,6 +335,12 @@ namespace FileReadDemo
         private static int _maxWorkerBusy;
         private static int _maxIoBusy;
         private static int _maxOsThreads;
+
+        // 평균 계산용 누적값들
+        private static long _sumWorkerBusy;
+        private static long _sumIoBusy;
+        private static long _sumOsThreads;
+        private static long _sampleCount;
 
         private static readonly object _lock = new object();
 
@@ -331,6 +355,11 @@ namespace FileReadDemo
                 _maxWorkerBusy = 0;
                 _maxIoBusy = 0;
                 _maxOsThreads = 0;
+
+                _sumWorkerBusy = 0;
+                _sumIoBusy = 0;
+                _sumOsThreads = 0;
+                _sampleCount = 0;
 
                 _cts = new CancellationTokenSource();
                 _monitorTask = Task.Run(() => MonitorLoopAsync(_cts.Token));
@@ -367,7 +396,26 @@ namespace FileReadDemo
                 }
             }
 
-            return new ThreadPoolStats(_maxWorkerBusy, _maxIoBusy, _maxOsThreads);
+            // 평균 계산
+            long sampleCount = Interlocked.Read(ref _sampleCount);
+            double avgWorker = 0;
+            double avgIo = 0;
+            double avgOs = 0;
+
+            if (sampleCount > 0)
+            {
+                avgWorker = (double)Interlocked.Read(ref _sumWorkerBusy) / sampleCount;
+                avgIo = (double)Interlocked.Read(ref _sumIoBusy) / sampleCount;
+                avgOs = (double)Interlocked.Read(ref _sumOsThreads) / sampleCount;
+            }
+
+            return new ThreadPoolStats(
+                _maxWorkerBusy,
+                _maxIoBusy,
+                _maxOsThreads,
+                avgWorker,
+                avgIo,
+                avgOs);
         }
 
         private static async Task MonitorLoopAsync(CancellationToken token)
@@ -398,6 +446,12 @@ namespace FileReadDemo
                     if (busyWorker > _maxWorkerBusy) _maxWorkerBusy = busyWorker;
                     if (busyIo > _maxIoBusy) _maxIoBusy = busyIo;
                     if (osThreads > _maxOsThreads) _maxOsThreads = osThreads;
+
+                    // 평균 계산용 누적
+                    Interlocked.Add(ref _sumWorkerBusy, busyWorker);
+                    Interlocked.Add(ref _sumIoBusy, busyIo);
+                    Interlocked.Add(ref _sumOsThreads, osThreads);
+                    Interlocked.Increment(ref _sampleCount);
 
                     // 화면에 실시간 표시
                     Ui.WriteThreadStats(
