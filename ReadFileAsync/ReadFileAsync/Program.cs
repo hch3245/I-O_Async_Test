@@ -190,7 +190,7 @@ namespace FileReadDemo
             Directory.CreateDirectory(folder);
 
             // 필요시 값 조절
-            const int fileSizeMB = 50;
+            const int fileSizeMB = 1500;
             const int fileCount = 100;
 
             if (!Directory.EnumerateFiles(folder).Any())
