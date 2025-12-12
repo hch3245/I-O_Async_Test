@@ -485,35 +485,19 @@ namespace FileReadDemo
         {
             new[]
             {
-                "   .   ",
-                "  ...  ",
-                " ..... ",
-                "  ...  ",
-                "   .   "
+                "　　　　 ∧＿＿∧　　　♪   ",
+                "　　　 （´・ω・｀∩       ",
+                "　　 　　o　　　,ﾉ       ",
+                "　　　　Ｏ＿　.ﾉ         ",
+                "♪　　　 　 (ノ          "
             },
             new[]
             {
-                "       ",
-                "   .   ",
-                "  ...  ",
-                "   .   ",
-                "       "
-            },
-            new[]
-            {
-                " .     ",
-                " ..    ",
-                " ...   ",
-                " ..    ",
-                " .     "
-            },
-            new[]
-            {
-                "       ",
-                " . .   ",
-                "  .    ",
-                " . .   ",
-                "       "
+                "　　　   ∧＿＿∧　♪       ",
+                "　　　  ∩ ・ω・｀）       ",
+                "　　　  |　　 ⊂ﾉ        ",
+                "　　　  |　⌒ _⊃　　♪    ",
+                "　　　  し              "
             }
         };
 
@@ -528,7 +512,7 @@ namespace FileReadDemo
 
                 try
                 {
-                    await Task.Delay(120, token);
+                    await Task.Delay(500, token);
                 }
                 catch (TaskCanceledException)
                 {
